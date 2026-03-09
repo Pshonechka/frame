@@ -1,32 +1,31 @@
-.286
+;.286
 .model tiny
+.data
+	top_symbols    db 201, 196, 187
+	bottom_symbols db 200, 205, 188
 .code
 org 100h
 
 locals @@
-;160*(height/2) + 80-LenCmd
-; [00110010][][][]...{ [10][5] } ...
-;			90
-;[][][][][][][][][][][][][][][][]
 
-VIDEOSEG   		  equ 0b800h
-STRBEFORE  		  equ 0
-LENCMDADR    	  equ 80h
-LENGTHFR          equ 30
-HEIGHTFR          equ 7
+VIDEO_SEG              equ 0b800h
+STR_BEFORE  	       equ 0
+LEN_CMD_ADR    	       equ 80h
+LENGTH_FRAME           equ 30
+HEIGHT_FRAME           equ 7
+CENTER_OF_SCREEN       equ 80
+WIDTH_OF_SCREEN	       equ 160
+COLOR                  equ 5fh or 80h
 
 
-Start:	mov ax, VIDEOSEG
+Start:	mov ax, VIDEO_SEG
 		mov es, ax
 
 		mov si, 82h
 
-		call Top
-		call Bottom
-		call Left
-		call Right
 
-		call PrintCmdLine
+
+		call PutCmdLineInCenter
 
 		mov ax, 4c00h
 		int 21h
@@ -38,190 +37,233 @@ Start:	mov ax, VIDEOSEG
 
 
 ;//////////////////////////////////////////////////////////////////////////////
-; prints command line
+
+; PrintCmdline -- prints command line
+
 ; src: bx - absolute (n*length_of_screen + shift)
-; change: cx, bx
-Cmdline proc
+; change: di, cx, bx = bx + cx
 
-	mov di, LENCMDADR
-	mov byte ptr cl, [di]
-	sub cx, 1
+PrintCmdline 		proc
 
-; while(addr[i] != 0) { addr[i] = pixel; addr++ }
-L:	mov al, ds: [si]
-	add si, 1
+					mov di, LEN_CMD_ADR
+					mov byte ptr cl, [di]
+					sub cx, 1
 
-	mov es:[bx], ax
-	add bx, 2
+					mov si, 82h
+					mov ah, COLOR
 
-	LOOP L
+					; for (i = N; i > 0; i--) { addr[i] = pixel[i] }
+@@NextSymbol:		mov al, ds: [si]
+					add si, 1
 
-	ret
-	endp
+					mov es:[bx], ax
+					add bx, 2
+
+					LOOP @@NextSymbol
+
+					ret
+					endp
 
 ;//////////////////////////////////////////////////////////////////////////////
 
-PrintCmdLine    proc
+; PrintCmdline -- prints command line in the center of frame
 
-				mov di, LENCMDADR
-				mov byte ptr cl, [di]
-				sub cx, 1
+; change: di, cx, bx
 
-				mov bx, 80
-				sub bx, cx
+PutCmdLineInCenter  proc
 
-				add bx, 160*3
+					mov di, LEN_CMD_ADR
+					mov byte ptr cl, [di]
 
-				call CmdLine
+					cmp cx, 0
+					je Finish
 
-				ret
-				endp
+     				sub cx, 1 ;for space
+
+					test cx, 1
+					JZ Chetnoe
+					add cx, 1
+
+Chetnoe:			mov bx, CENTER_OF_SCREEN
+					sub bx, cx
+
+					add bx, WIDTH_OF_SCREEN*3 ;//TODO: replace
+
+					call PrintCmdLine
+
+Finish:				ret
+					endp
 
 ;//////////////////////////////////////////////////////////////////////////////
 
 ; SymbN -- prints symbol N times
 
-; entry: cx - N times
-;      	 al - ascii code of symbol
-;	 ah - color of symbol
-;	 bx - place where prints absolute
-; kill:   cx, bx = bx + cx
+; src:      cx - N times
+;        	al - ascii code of symbol
+;	 	    ah - color of symbol
+;		    bx - place where prints absolute
+; change:   cx, bx = bx + cx
 
-SymbN   proc
+SymbN   			proc
 
-; for (i = N; i > 0; i--) { addr[i] = pixel  }
-M:	mov es:[bx], ax
-	add bx, 2
+					; for (i = N; i > 0; i--) { addr[i] = pixel  }
+@@NextSymbol:	    mov es:[bx], ax
+					add bx, 2
 
-	LOOP M
+					LOOP @@NextSymbol
 
-	ret
-	endp
+					ret
+					endp
 
 ;//////////////////////////////////////////////////////////////////////////////
-;<.........> - 1
-;{...1ss...} - 2
-;{...sss...} - 2
-;(.........) - 3
+
+; Top -- prints top part of frame + top angles
+
+; change:   ax, cx, bx = bx + 2 * cx
 
 Top     proc
-		mov cx, LENGTHFR
 
-		mov bx, 80
-		sub bx, cx
+					Call GetShiftLeft
 
-		mov al, 201
-		mov ah, 5fh or 80h
+					mov al, 201
+					mov ah, COLOR
+					mov es:[bx], ax ;top left angle
+	    			add bx, 2
 
-		mov es:[bx], ax ;top left angle
-	    add bx, 2
+					mov al, 196
+					mov ah, COLOR
+					sub cx, 2
+					call SymbN
 
-		mov al, 196
-		mov ah, 5fh or 80h
-		sub cx, 2
-		call SymbN
-		mov al, 187
-		mov ah, 5fh or 80h
+					mov al, 187
+					mov ah, COLOR
+					mov es:[bx], ax ;top right angle
+	    			add bx, 2
 
-		mov es:[bx], ax ;top right angle
-	    add bx, 2
-
-		ret
-		endp
+					ret
+					endp
 
 
 ;//////////////////////////////////////////////////////////////////////////////
 
-Bottom  proc
-		mov cx, LENGTHFR
+; Bottom -- prints bottom part of frame + bottom angles
 
-		mov bx, 80
-		sub bx, cx
-		mov cx, HEIGHTFR
-		sub cx, 1
+; change:   ax, cx, bx = bx + 2 * cx
 
-		mov ax, 160
-		mul cx
+Bottom  			proc
 
-		;mov cx, 640
-		add bx, ax
+					Call GetShiftLeft
 
-		mov cx, LENGTHFR
+					mov cx, HEIGHT_FRAME
+					sub cx, 1
+
+					mov ax, WIDTH_OF_SCREEN
+					mul cx
+
+					;mov cx, 640
+					add bx, ax
+
+					mov cx, LENGTH_FRAME
 
 
-		   ;add bx, 640 ;4*160
-		;mov bx, 610;(hight-1)*160 - len
+		   			;add bx, 640 ;4*160
+					;mov bx, 610;(hight-1)*160 - len
 
-		mov al, 200
-		mov ah, 5fh or 80h
+					mov al, 200
+					mov ah, COLOR
+					mov es:[bx], ax ;bottom left angle
+	    			add bx, 2
 
-		mov es:[bx], ax ;bottom left angle
-	    add bx, 2
+					mov al, 205
+					mov ah, COLOR
+					sub cx, 2
+					call SymbN
 
-		mov al, 205
-		mov ah, 5fh or 80h
-		sub cx, 2
-		call SymbN
-		mov al, 188
-		mov ah, 5fh or 80h
+					mov al, 188
+					mov ah, COLOR
+					mov es:[bx], ax ;bottom right angle
+	    			add bx, 2
 
-		mov es:[bx], ax ;bottom right angle
-	    add bx, 2
-
-		ret
-		endp
-
-;//////////////////////////////////////////////////////////////////////////////
-
-Left    proc
-		mov cx, LENGTHFR
-
-		mov bx, 80
-		sub bx, cx
-
-		add bx, 160
-
-		mov al, 03h
-		mov ah, 5fh or 80h
-
-		mov cx, LENGTHFR
-		sub cx, 2
-
-		mov al, 03h
-		mov ah, 5fh or 80h
-
-N:	    mov es:[bx], ax
-		add bx, 160
-
-		LOOP N
-
-		ret
-		endp
+					ret
+					endp
 
 ;//////////////////////////////////////////////////////////////////////////////
 
-Right   proc
-		mov cx, LENGTHFR
+Left    			proc
 
-		mov bx, 80
-		add bx, cx
-		add bx, 160
-		sub bx, 2
+					Call GetShiftLeft
 
-		mov cx, HEIGHTFR
-		sub cx, 2
+					add bx, WIDTH_OF_SCREEN
 
-		mov al, 03h
-		mov ah, 5fh or 80h
+					mov cx, HEIGHT_FRAME
+					sub cx, 2
 
-R:	    mov es:[bx], ax
-		add bx, 160
+					mov al, 03h
+					mov ah, COLOR
 
-		LOOP R
+@@NextSymbol:	    mov es:[bx], ax
+					add bx, WIDTH_OF_SCREEN
 
-		ret
-		endp
+					LOOP @@NextSymbol
 
+					ret
+					endp
+
+;//////////////////////////////////////////////////////////////////////////////
+
+
+
+Right   			proc
+
+					Call GetShiftRight
+
+					add bx, WIDTH_OF_SCREEN
+					sub bx, 2
+
+					mov cx, HEIGHT_FRAME
+					sub cx, 2  ;without angles
+
+					mov al, 03h
+					mov ah, COLOR
+
+@@NextSymbol:	    mov es:[bx], ax
+					add bx, WIDTH_OF_SCREEN
+
+					LOOP @@NextSymbol
+
+					ret
+					endp
+
+
+;//////////////////////////////////////////////////////////////////////////////
+
+; GetShiftRight -- records offset in bx - center - length of frame
+
+; change: cx, bx bx = center - cx
+
+GetShiftRight    	proc
+
+					mov cx, LENGTH_FRAME
+					mov bx, CENTER_OF_SCREEN
+					add bx, cx
+
+					ret
+					endp
+
+;//////////////////////////////////////////////////////////////////////////////
+
+; GetShiftLeft -- records offset in bx - center + length of frame
+
+; change: cx, bx = center + cx
+
+GetShiftLeft  	   proc
+
+					mov cx, LENGTH_FRAME
+					mov bx, CENTER_OF_SCREEN
+					sub bx, cx
+
+					ret
+					endp
 
 ;//////////////////////////////////////////////////////////////////////////////
 
