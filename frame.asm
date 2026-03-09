@@ -3,6 +3,9 @@
 .data
 	top_symbols    db 201, 196, 187
 	bottom_symbols db 200, 205, 188
+    left_symbol    db 03h
+    right_symbol   db 03h
+
 .code
 
 org 100h
@@ -27,17 +30,16 @@ Start:	mov ax, VIDEO_SEG
         mov dx, offset top_symbols
 		call Horizontal
 
-
         call ShiftLeftBottom
         mov dx, offset bottom_symbols
         call Horizontal
 
         call GetShiftLeft
-        mov al, 03h
+        mov al, left_symbol
         call Vertical
 
         call GetShiftRight
-        mov al, 03h
+        mov al, right_symbol
         call Vertical
 
 		call PutCmdLineInCenter
@@ -102,7 +104,13 @@ PutCmdLineInCenter  proc
 Chetnoe:			mov bx, CENTER_OF_SCREEN
 					sub bx, cx
 
-					add bx, WIDTH_OF_SCREEN*3 ;//TODO: replace
+                    mov ax, HEIGHT_FRAME
+                    shr ax, 1
+
+                    mov cx, WIDTH_OF_SCREEN
+                    mul cx
+
+					add bx, ax
 
 					call PrintCmdLine
 
