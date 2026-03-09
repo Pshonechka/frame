@@ -4,6 +4,7 @@
 	top_symbols    db 201, 196, 187
 	bottom_symbols db 200, 205, 188
 .code
+
 org 100h
 
 locals @@
@@ -11,7 +12,7 @@ locals @@
 VIDEO_SEG              equ 0b800h
 STR_BEFORE  	       equ 0
 LEN_CMD_ADR    	       equ 80h
-LENGTH_FRAME           equ 30
+LENGTH_FRAME           equ 20
 HEIGHT_FRAME           equ 7
 CENTER_OF_SCREEN       equ 80
 WIDTH_OF_SCREEN	       equ 160
@@ -21,9 +22,23 @@ COLOR                  equ 5fh or 80h
 Start:	mov ax, VIDEO_SEG
 		mov es, ax
 
-		mov si, 82h
+
+		call ShiftLeftTop
+        mov dx, offset top_symbols
+		call Horizontal
 
 
+        call ShiftLeftBottom
+        mov dx, offset bottom_symbols
+        call Horizontal
+
+        call GetShiftLeft
+        mov al, 03h
+        call Vertical
+
+        call GetShiftRight
+        mov al, 03h
+        call Vertical
 
 		call PutCmdLineInCenter
 
@@ -56,7 +71,7 @@ PrintCmdline 		proc
 @@NextSymbol:		mov al, ds: [si]
 					add si, 1
 
-					mov es:[bx], ax
+					mov es: [bx], ax
 					add bx, 2
 
 					LOOP @@NextSymbol
@@ -117,26 +132,29 @@ SymbN   			proc
 
 ;//////////////////////////////////////////////////////////////////////////////
 
-; Top -- prints top part of frame + top angles
 
-; change:   ax, cx, bx = bx + 2 * cx
+; Horizontal -- prints horizontal parts of frame + angles
 
-Top     proc
+; src:      dx - pointer to array with ascii codes of 3 symb
+;           bx - position
+; change:   si, ax, cx, bx = bx + 2 * cx
 
-					Call GetShiftLeft
+Horizontal          proc
 
-					mov al, 201
+                    mov si, dx
+                    mov al, [si]
 					mov ah, COLOR
 					mov es:[bx], ax ;top left angle
 	    			add bx, 2
 
-					mov al, 196
-					mov ah, COLOR
+					inc si
+                    mov al, [si]
+                    mov cx, LENGTH_FRAME
 					sub cx, 2
 					call SymbN
 
-					mov al, 187
-					mov ah, COLOR
+					inc si
+                    mov al, [si]
 					mov es:[bx], ax ;top right angle
 	    			add bx, 2
 
@@ -146,57 +164,16 @@ Top     proc
 
 ;//////////////////////////////////////////////////////////////////////////////
 
-; Bottom -- prints bottom part of frame + bottom angles
+; Vertical -- prints vertical parts of frame
 
-; change:   ax, cx, bx = bx + 2 * cx
+; src:      al - ascii code of symbol
+;           bx - position
+; change:   si, ax, cx, bx = bx + 2 * cx
 
-Bottom  			proc
-
-					Call GetShiftLeft
-
-					mov cx, HEIGHT_FRAME
-					sub cx, 1
-
-					mov ax, WIDTH_OF_SCREEN
-					mul cx
-
-					;mov cx, 640
-					add bx, ax
-
-					mov cx, LENGTH_FRAME
-
-
-		   			;add bx, 640 ;4*160
-					;mov bx, 610;(hight-1)*160 - len
-
-					mov al, 200
-					mov ah, COLOR
-					mov es:[bx], ax ;bottom left angle
-	    			add bx, 2
-
-					mov al, 205
-					mov ah, COLOR
-					sub cx, 2
-					call SymbN
-
-					mov al, 188
-					mov ah, COLOR
-					mov es:[bx], ax ;bottom right angle
-	    			add bx, 2
-
-					ret
-					endp
-
-;//////////////////////////////////////////////////////////////////////////////
-
-Left    			proc
-
-					Call GetShiftLeft
-
-					add bx, WIDTH_OF_SCREEN
+Vertical    	    proc
 
 					mov cx, HEIGHT_FRAME
-					sub cx, 2
+					sub cx, 2 ;without angles
 
 					mov al, 03h
 					mov ah, COLOR
@@ -209,30 +186,6 @@ Left    			proc
 					ret
 					endp
 
-;//////////////////////////////////////////////////////////////////////////////
-
-
-
-Right   			proc
-
-					Call GetShiftRight
-
-					add bx, WIDTH_OF_SCREEN
-					sub bx, 2
-
-					mov cx, HEIGHT_FRAME
-					sub cx, 2  ;without angles
-
-					mov al, 03h
-					mov ah, COLOR
-
-@@NextSymbol:	    mov es:[bx], ax
-					add bx, WIDTH_OF_SCREEN
-
-					LOOP @@NextSymbol
-
-					ret
-					endp
 
 
 ;//////////////////////////////////////////////////////////////////////////////
@@ -247,6 +200,19 @@ GetShiftRight    	proc
 					mov bx, CENTER_OF_SCREEN
 					add bx, cx
 
+                    add bx, WIDTH_OF_SCREEN
+					sub bx, 2
+
+					ret
+					endp
+
+GetShiftLeft    	proc
+
+					call ShiftLeftTop
+
+                    add bx, WIDTH_OF_SCREEN
+
+
 					ret
 					endp
 
@@ -256,7 +222,7 @@ GetShiftRight    	proc
 
 ; change: cx, bx = center + cx
 
-GetShiftLeft  	   proc
+ShiftLeftTop  	    proc
 
 					mov cx, LENGTH_FRAME
 					mov bx, CENTER_OF_SCREEN
@@ -265,6 +231,23 @@ GetShiftLeft  	   proc
 					ret
 					endp
 
+
+
+ShiftLeftBottom     proc
+
+                    Call ShiftLeftTop
+
+					mov cx, HEIGHT_FRAME
+					sub cx, 1
+
+					mov ax, WIDTH_OF_SCREEN
+					mul cx
+					add bx, ax
+
+					mov cx, LENGTH_FRAME
+
+                    ret
+                    endp
 ;//////////////////////////////////////////////////////////////////////////////
 
 end    	 Start
