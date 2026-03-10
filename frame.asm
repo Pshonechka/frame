@@ -98,10 +98,10 @@ PutCmdLineInCenter  proc
      				sub cx, 1 ;for space
 
 					test cx, 1
-					JZ Chetnoe
+					JZ @@Chetnoe
 					add cx, 1
 
-Chetnoe:			mov bx, CENTER_OF_SCREEN
+@@Chetnoe:			mov bx, CENTER_OF_SCREEN
 					sub bx, cx
 
                     mov ax, HEIGHT_FRAME
@@ -205,7 +205,11 @@ Vertical    	    proc
 GetShiftRight    	proc
 
 					mov cx, LENGTH_FRAME
-					mov bx, CENTER_OF_SCREEN
+					test cx, 1
+					JZ @@Chetnoe
+					sub cx, 1
+
+@@Chetnoe:			mov bx, CENTER_OF_SCREEN
 					add bx, cx
 
                     add bx, WIDTH_OF_SCREEN
@@ -213,6 +217,14 @@ GetShiftRight    	proc
 
 					ret
 					endp
+
+
+;//////////////////////////////////////////////////////////////////////////////
+
+; GetShiftLeft -- records offset in bx - center + length of frame
+
+; change: cx, bx = center + cx
+
 
 GetShiftLeft    	proc
 
@@ -232,14 +244,19 @@ GetShiftLeft    	proc
 
 ShiftLeftTop  	    proc
 
-					mov cx, LENGTH_FRAME
 					mov bx, CENTER_OF_SCREEN
-					sub bx, cx
+					mov cx, LENGTH_FRAME
+					test cx, 1
+					JZ @@Chetnoe
+					add cx, 1
+
+@@Chetnoe:			sub bx, cx
 
 					ret
 					endp
 
 
+;//////////////////////////////////////////////////////////////////////////////
 
 ShiftLeftBottom     proc
 
@@ -254,8 +271,13 @@ ShiftLeftBottom     proc
 
 					mov cx, LENGTH_FRAME
 
-                    ret
+					test cx, 1
+					JZ @@Chetnoe
+					add cx, 1
+
+@@Chetnoe:			ret
                     endp
+
 ;//////////////////////////////////////////////////////////////////////////////
 
 end    	 Start
